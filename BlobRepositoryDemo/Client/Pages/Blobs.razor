@@ -1,0 +1,143 @@
+﻿@page "/blobs"
+
+@inject CustomerManager CustomerManager
+
+<h1>Blob Storage Repository with Int32 PK</h1>
+
+@foreach (var customer in Customers)
+{
+    <p>(@customer.Id) @customer.Name, @customer.Email</p>
+}
+@if (Customers.Count > 0)
+{
+    <button @onclick="UpdateIsadora">Update Isadora</button>
+    <button @onclick="DeleteRocky">Delete Rocky</button>
+    <button @onclick="DeleteHugh">Delete Hugh</button>
+    <button @onclick="GetJenny">GetJenny</button>
+    <button @onclick="AddCustomers">Reset Data</button>
+}
+
+<br />
+<br />
+<p>@JennyMessage</p>
+
+@code
+{
+
+    List<Customer> Customers = new List<Customer>();
+    string JennyMessage = "";
+
+    async Task DeleteRocky()
+    {
+        var rocky = (from x in Customers
+                     where x.Email == "rocky@rhodes.com"
+                     select x).FirstOrDefault();
+        if (rocky != null)
+        {
+            await CustomerManager.Delete(rocky);
+            await Reload();
+        }
+    }
+
+    async Task DeleteHugh()
+    {
+        var hugh = (from x in Customers
+                    where x.Email == "hugh@jass.com"
+                    select x).FirstOrDefault();
+        if (hugh != null)
+        {
+            await CustomerManager.Delete(hugh.Id);
+            await Reload();
+        }
+    }
+
+    async Task UpdateIsadora()
+    {
+        var isadora = (from x in Customers
+                       where x.Email == "isadora@jarr.com"
+                       select x).FirstOrDefault();
+        if (isadora != null)
+        {
+            isadora.Email = "isadora@isadorajarr.com";
+            await CustomerManager.Update(isadora);
+            await Reload();
+        }
+    }
+
+    async Task GetJenny()
+    {
+        JennyMessage = "";
+        var jenny = (from x in Customers
+                     where x.Email == "jenny@jones.com"
+                     select x).FirstOrDefault();
+        if (jenny != null)
+        {
+            var jennyDb = await CustomerManager.GetById(jenny.Id);
+            if (jennyDb != null)
+            {
+                JennyMessage = $"Retrieved Jenny via Id {jennyDb.Id}";
+            }
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        if (Customers.Count == 0)
+            await AddCustomers();
+    }
+
+    async Task Reload()
+    {
+        JennyMessage = "";
+        var list = await CustomerManager.GetAll();
+        if (list != null)
+        {
+            Customers = list.ToList();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task AddCustomers()
+    {
+        await CustomerManager.DeleteAll();
+
+        foreach (var customer in Customers)
+        {
+            await CustomerManager.Delete(customer);
+        }
+
+        Customers.Clear();
+
+        await CustomerManager.Insert(new Customer
+        {
+            Id = 1,
+            Name = "Isadora Jarr",
+            Email = "isadora@jarr.com"
+        });
+
+        await CustomerManager.Insert(new Customer
+        {
+            Id = 2,
+            Name = "Rocky Rhodes",
+            Email = "rocky@rhodes.com"
+        });
+
+        await CustomerManager.Insert(new Customer
+        {
+            Id = 3,
+            Name = "Jenny Jones",
+            Email = "jenny@jones.com"
+        });
+
+        await CustomerManager.Insert(new Customer
+        {
+            Id = 4,
+            Name = "Hugh Jass",
+            Email = "hugh@jass.com"
+        });
+
+        await Reload();
+    }
+}
