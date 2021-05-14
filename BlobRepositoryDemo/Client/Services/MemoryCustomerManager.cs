@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 
 namespace BlobRepositoryDemo.Client.Services
 {
-    public class InMemoryCustomerManager : APIRepository<Customer>
+    public class MemoryCustomerManager : APIRepository<Customer>
     {
         HttpClient http;
 
-        public InMemoryCustomerManager(HttpClient _http)
+        public MemoryCustomerManager(HttpClient _http)
             : base(_http, "inmemorycustomers", "Id")
         {
             http = _http;

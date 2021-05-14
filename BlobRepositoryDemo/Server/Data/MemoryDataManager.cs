@@ -56,8 +56,10 @@ namespace BlobRepositoryDemo.Server.Data
             Data.Clear();
         }
 
-        public async Task<IEnumerable<TEntity>> Get(Expression<Func<TEntity, bool>> filter = null,
-            Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> orderBy = null, string includeProperties = "")
+        public async Task<IEnumerable<TEntity>> Get(Expression<Func<TEntity, bool>>
+           filter = null, Func<IQueryable<TEntity>,
+           IOrderedQueryable<TEntity>> orderBy = null,
+           string includeProperties = "")
         {
             return await Task.Run(() =>
             {
@@ -103,11 +105,15 @@ namespace BlobRepositoryDemo.Server.Data
             TEntity entity = null;
             if (IdProperty.PropertyType.IsValueType)
             {
-                entity = (from x in Data where IdProperty.GetValue(x).ToString() == Id.ToString() select x).FirstOrDefault();
+                entity = (from x in Data
+                          where IdProperty.GetValue(x).ToString() == Id.ToString()
+                          select x).FirstOrDefault();
             }
             else
             {
-                entity = (from x in Data where IdProperty.GetValue(x) == Id select x).FirstOrDefault();
+                entity = (from x in Data
+                          where IdProperty.GetValue(x) == Id
+                          select x).FirstOrDefault();
             }
             return entity;
         }

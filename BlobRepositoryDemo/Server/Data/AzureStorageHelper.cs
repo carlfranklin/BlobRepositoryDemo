@@ -7,7 +7,6 @@ using System.IO;
 using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Blob;
 
-
 namespace BlobRepositoryDemo.Server.Data
 {
     public class AzureStorageHelper
@@ -34,7 +33,8 @@ namespace BlobRepositoryDemo.Server.Data
             UploadStatus?.Invoke(this, arg);
         }
 
-        public async Task UploadFileInChunks(string containerName, string sourceFilename, string destFileName)
+        public async Task UploadFileInChunks(string containerName,
+                                             string sourceFilename, string destFileName)
         {
             using Stream stream = System.IO.File.OpenRead(sourceFilename);
 
@@ -58,9 +58,11 @@ namespace BlobRepositoryDemo.Server.Data
                 // increment block number by 1 each iteration
                 blockNumber++;
 
-                // set block ID as a string and convert it to Base64 which is the required format
+                // set block ID as a string and convert it to Base64 
+                // which is the required format
                 string blockId = $"{blockNumber:0000000}";
-                string base64BlockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(blockId));
+                string base64BlockId =
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(blockId));
 
                 // create buffer and retrieve chunk
                 byte[] buffer = new byte[size];
@@ -68,22 +70,26 @@ namespace BlobRepositoryDemo.Server.Data
                 totalBytesRead += bytesRead;
 
                 // Upload buffer chunk to Azure
-                await blob.PutBlockAsync(base64BlockId, new MemoryStream(buffer, 0, bytesRead), null);
+                await blob.PutBlockAsync(base64BlockId,
+                                         new MemoryStream(buffer, 0, bytesRead), null);
 
                 raiseUploadEventSafely(totalBytesRead, Convert.ToInt32(stream.Length));
 
                 // add the current blockId into our list
                 blockList.Add(base64BlockId);
 
-                // While bytesRead == size it means there is more data left to read and process
+                // While bytesRead == size it means there is more data 
+                // left to read and process
             } while (bytesRead == size);
 
-            // add the blockList to the Azure which allows the resource to stick together the chunks
+            // add the blockList to the Azure which allows the resource 
+            // to stick together the chunks
             await blob.PutBlockListAsync(blockList);
 
         }
 
-        public async Task DownloadFile(string containerName, string sourceFilename, string destFileName)
+        public async Task DownloadFile(string containerName,
+                                       string sourceFilename, string destFileName)
         {
             await OpenContianer(containerName);
 
@@ -99,10 +105,12 @@ namespace BlobRepositoryDemo.Server.Data
             {
 
                 CloudStorageAccount storageAccount;
-                if (CloudStorageAccount.TryParse(AzureBlobStorageConnectionString, out storageAccount))
+                if (CloudStorageAccount.TryParse(AzureBlobStorageConnectionString,
+                                                 out storageAccount))
                 {
                     // Create the container and return a container client object
-                    CloudBlobClient cloudBlobClient = storageAccount.CreateCloudBlobClient();
+                    CloudBlobClient cloudBlobClient =
+                        storageAccount.CreateCloudBlobClient();
                     container = cloudBlobClient.GetContainerReference(containerName);
                     if (!container.Exists())
                     {
@@ -114,48 +122,6 @@ namespace BlobRepositoryDemo.Server.Data
             {
                 var msg = ex.Message;
             }
-        }
-
-        public string GetUniqueFileName(string fileNameWithoutExtension)
-        {
-            fileNameWithoutExtension = fileNameWithoutExtension.Trim();
-
-            // look backwords from the right for the first non-number
-            int len = fileNameWithoutExtension.Length;
-            for (int i = len - 1; i > 0; i--)
-            {
-                if (!IsNumeric(fileNameWithoutExtension.Substring(i, 1)))
-                {
-                    if (i < len - 1)
-                    {
-                        // we have a number;
-                        string num = fileNameWithoutExtension.Substring(i + 1);
-                        return fileNameWithoutExtension.Substring(0, i + 1) +
-                            (Convert.ToInt32(num) + 1).ToString();
-                    }
-                    else
-                    {
-                        return fileNameWithoutExtension + "1";
-                    }
-                }
-            }
-            // we got all the way through. This filaname is all numbers. Add a _1 to the end.
-            return fileNameWithoutExtension + "_1";
-        }
-
-        bool IsNumeric(string text)
-        {
-            int l = text.Length;
-            string numbers = "01234567890-.,";
-
-            for (int i = 0; i < l; i++)
-            {
-                if (!numbers.Contains(text.Substring(i, 1)))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
     }
 

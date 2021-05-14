@@ -86,7 +86,8 @@ namespace BlobRepositoryDemo.Server.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<APIEntityResponse<Customer>>> Insert([FromBody] Customer Customer)
+        public async Task<ActionResult<APIEntityResponse<Customer>>>
+            Insert([FromBody] Customer Customer)
         {
             try
             {
@@ -104,7 +105,8 @@ namespace BlobRepositoryDemo.Server.Controllers
                     return Ok(new APIEntityResponse<Customer>()
                     {
                         Success = false,
-                        ErrorMessages = new List<string>() { "Could not find customer after adding it." },
+                        ErrorMessages = new List<string>()
+                            { "Could not find customer after adding it." },
                         Data = null
                     });
                 }
@@ -117,7 +119,8 @@ namespace BlobRepositoryDemo.Server.Controllers
         }
 
         [HttpPut]
-        public async Task<ActionResult<APIEntityResponse<Customer>>> Update([FromBody] Customer Customer)
+        public async Task<ActionResult<APIEntityResponse<Customer>>>
+            Update([FromBody] Customer Customer)
         {
             try
             {
@@ -135,7 +138,8 @@ namespace BlobRepositoryDemo.Server.Controllers
                     return Ok(new APIEntityResponse<Customer>()
                     {
                         Success = false,
-                        ErrorMessages = new List<string>() { "Could not find customer after updating it." },
+                        ErrorMessages = new List<string>()
+                          { "Could not find customer after updating it." },
                         Data = null
                     });
                 }
@@ -145,7 +149,6 @@ namespace BlobRepositoryDemo.Server.Controllers
                 // log exception here
                 return StatusCode(500);
             }
-
         }
 
         [HttpDelete("{Id}")]
@@ -162,7 +165,5 @@ namespace BlobRepositoryDemo.Server.Controllers
                 return StatusCode(500);
             }
         }
-
-
     }
 }

@@ -23,7 +23,8 @@ namespace BlobRepositoryDemo.Client.Services
         string primaryKeyName;
         HttpClient http;
 
-        public APIRepository(HttpClient _http, string _controllerName, string _primaryKeyName)
+        public APIRepository(HttpClient _http,
+            string _controllerName, string _primaryKeyName)
         {
             http = _http;
             controllerName = _controllerName;
@@ -38,7 +39,9 @@ namespace BlobRepositoryDemo.Client.Services
                 var result = await http.GetAsync(controllerName);
                 result.EnsureSuccessStatusCode();
                 string responseBody = await result.Content.ReadAsStringAsync();
-                var response = JsonConvert.DeserializeObject<APIListOfEntityResponse<TEntity>>(responseBody);
+                var response =
+                    JsonConvert.DeserializeObject<APIListOfEntityResponse<TEntity>>
+                    (responseBody);
                 if (response.Success)
                     return response.Data;
                 else
@@ -59,7 +62,8 @@ namespace BlobRepositoryDemo.Client.Services
                 var result = await http.GetAsync(url);
                 result.EnsureSuccessStatusCode();
                 string responseBody = await result.Content.ReadAsStringAsync();
-                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>(responseBody);
+                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>
+                    (responseBody);
                 if (response.Success)
                     return response.Data;
                 else
@@ -79,7 +83,8 @@ namespace BlobRepositoryDemo.Client.Services
                 var result = await http.PostAsJsonAsync(controllerName, entity);
                 result.EnsureSuccessStatusCode();
                 string responseBody = await result.Content.ReadAsStringAsync();
-                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>(responseBody);
+                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>
+                    (responseBody);
                 if (response.Success)
                     return response.Data;
                 else
@@ -98,7 +103,8 @@ namespace BlobRepositoryDemo.Client.Services
                 var result = await http.PutAsJsonAsync(controllerName, entityToUpdate);
                 result.EnsureSuccessStatusCode();
                 string responseBody = await result.Content.ReadAsStringAsync();
-                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>(responseBody);
+                var response = JsonConvert.DeserializeObject<APIEntityResponse<TEntity>>
+                    (responseBody);
                 if (response.Success)
                     return response.Data;
                 else
@@ -146,7 +152,10 @@ namespace BlobRepositoryDemo.Client.Services
             }
         }
 
-        public Task<IEnumerable<TEntity>> Get(Expression<Func<TEntity, bool>> Filter = null, Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>> OrderBy = null, string IncludeProperties = "")
+        public Task<IEnumerable<TEntity>> Get(Expression<Func<TEntity, bool>>
+           Filter = null, Func<IQueryable<TEntity>,
+           IOrderedQueryable<TEntity>> OrderBy = null,
+           string IncludeProperties = "")
         {
             throw new NotImplementedException();
         }
