@@ -1389,7 +1389,47 @@ namespace BlobRepositoryDemo.Server.Data
 
 `BlobDataManager<TEntity>` is an implementation of `IRepository<TEntity>` that reads and writes to a blob storage container. 
 
-> TODO: More explanation is needed here
+Check out the `SaveData()` method:
+
+```c#
+        /// <summary>
+        /// Thread-safe way to save data when it changes
+        /// </summary>
+        /// <returns></returns>
+        private async Task SaveData()
+        {
+            // SemaphoreSlim only allows one caller at a time to save the file
+            await SemaphoreSlim.WaitAsync();
+            try
+            {
+                // serialize
+                var json = JsonConvert.SerializeObject(Data);
+                // write to local file
+                File.WriteAllText(DataFileName, json);
+                // upload to blob storage
+                await AzureStorageHelper.UploadFileInChunks(ContainerName,
+                    DataFileName, Path.GetFileName(DataFileName));
+            }
+            finally
+            {
+                SemaphoreSlim.Release();
+            }
+        }
+```
+
+This line of code waits asynchronously if another thread is accessing the code that follows it:
+
+```c#
+await SemaphoreSlim.WaitAsync();
+```
+
+This ensures only one client can access it at a time.
+
+After writing the file and uploading it to the blob container, we can release the semaphore like so:
+
+```c#
+SemaphoreSlim.Release();
+```
 
 ## Step 13 - Add magic strings to *appsettings.json*
 
@@ -1935,6 +1975,30 @@ builder.Services.AddScoped<CustomerManager>();
 }
 ```
 
+The only difference between this page and `Index.razor` is in the `OnInitialziedAsync()` method.
+
+*Index.razor*:
+
+```c#
+    protected override async Task OnInitializedAsync()
+    {
+        await AddCustomers();
+    }
+```
+
+*Blobs.razor*:
+
+```c#
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        if (Customers.Count == 0)
+            await AddCustomers();
+    }
+```
+
+The in-memory version needs to create the list of `Customer` every time, whereas `Blobs.razor` is working with entities that are persisted, so we first want to try retrieving them, and create them only if they don't exist.
+
 ## Step 19 - Modify the NavMenu
 
 Update the client project's *\Shared\NavMenu.razor* file:
@@ -1981,8 +2045,426 @@ Update the client project's *\Shared\NavMenu.razor* file:
 
 Run the app and select the second option in the NavMenu: 
 
-> TODO: Add image here
+![image-20210515094207214](images/image-20210515094207214.png)
+
+## Step 19 - Customer Model with Guid Id
+
+Next, we're going to use our existing infrastructure to handle a model where the Id property (primary key) is a Guid rather than an integer.
+
+To the *Models* folder in the shared project, add this:
+
+*CustomerWithGuidId.cs*:
+
+```c#
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BlobRepositoryDemo.Shared.Models
+{
+    public class CustomerWithGuidId
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+    }
+}
+```
+
+## Step 20 - Configure BlobDataManager in Startup
+
+Add this to the server project's *Startup.cs* file in the `ConfigureServices` method:
+
+```c#
+            services.AddSingleton<IRepository<CustomerWithGuidId>>(x => 
+                new BlobDataManager<CustomerWithGuidId>(
+                    Configuration["AzureBlobConnectionString"],
+                    Configuration["AzureParentContainerUrl"],
+                    "customers", // Name of blob storage container
+                    "Id", // Name of primary key property
+                    5));
+```
+
+## Step 21 - Add a controller
+
+To the server project's *Controllers* folder, add the following:
+
+*CustomerWithGuidIdsController.cs*:
+
+```c#
+using BlobRepositoryDemo.Server.Data;
+using BlobRepositoryDemo.Shared.Models;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace BlobRepositoryDemo.Server.Controllers
+{
+    [Route("[controller]")]
+    [ApiController]
+    public class CustomerWithGuidIdsController : ControllerBase
+    {
+        IRepository<CustomerWithGuidId> customersManager;
+
+        public CustomerWithGuidIdsController(IRepository<CustomerWithGuidId> 
+                                             _customersManager)
+        {
+            customersManager = _customersManager;
+        }
+
+        [HttpGet("deleteall")]
+        public async Task<ActionResult> DeleteAll()
+        {
+            try
+            {
+                await customersManager.DeleteAll();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                return StatusCode(500);
+            }
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<APIListOfEntityResponse<CustomerWithGuidId>>>
+            Get()
+        {
+            try
+            {
+                var result = await customersManager.Get();
+                return Ok(new APIListOfEntityResponse<CustomerWithGuidId>()
+                {
+                    Success = true,
+                    Data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                return StatusCode(500);
+            }
+        }
+
+        [HttpGet("{Id}")]
+        public async Task<ActionResult<APIEntityResponse<CustomerWithGuidId>>>
+            GetById(Guid Id)
+        {
+
+            try
+            {
+                var result = await customersManager.GetById(Id);
+                if (result != null)
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = true,
+                        Data = result
+                    });
+                }
+                else
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = false,
+                        ErrorMessages = new List<string>() { "Customer Not Found" },
+                        Data = null
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                return StatusCode(500);
+            }
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<APIEntityResponse<CustomerWithGuidId>>>
+            Insert([FromBody] CustomerWithGuidId Customer)
+        {
+            try
+            {
+                var result = await customersManager.Insert(Customer);
+                if (result != null)
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = true,
+                        Data = result
+                    });
+                }
+                else
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = false,
+                        ErrorMessages = new List<string>() 
+                            { "Could not find customer after adding it." },
+                        Data = null
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                return StatusCode(500);
+            }
+        }
+
+        [HttpPut]
+        public async Task<ActionResult<APIEntityResponse<CustomerWithGuidId>>>
+            Update([FromBody] CustomerWithGuidId Customer)
+        {
+            try
+            {
+                var result = await customersManager.Update(Customer);
+                if (result != null)
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = true,
+                        Data = result
+                    });
+                }
+                else
+                {
+                    return Ok(new APIEntityResponse<CustomerWithGuidId>()
+                    {
+                        Success = false,
+                        ErrorMessages = new List<string>() 
+                            { "Could not find customer after updating it." },
+                        Data = null
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                return StatusCode(500);
+            }
+        }
+
+        [HttpDelete("{Id}")]
+        public async Task<ActionResult<bool>> Delete(Guid Id)
+        {
+            try
+            {
+                return await customersManager.Delete(Id);
+            }
+            catch (Exception ex)
+            {
+                // log exception here
+                var msg = ex.Message;
+                return StatusCode(500);
+            }
+        }
+    }
+}
+```
+
+The only difference here is that we're dealing with `CustomerWithGuidId` objects instead of `Customer` objects. The `customerManager` is defined as an `IRepository<CustomerWithGuidId>` rather than an `IRepository<Customer>`. Also, `Id` parameters are always Guids.
+
+## Step 22 - Add a Client-Side Manager
+
+To the client project's *Services* folder, add this:
+
+*CustomerWithGuidIdManager.cs*:
+
+```c#
+using BlobRepositoryDemo.Shared.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+namespace BlobRepositoryDemo.Client.Services
+{
+    public class CustomerWithGuidIdManager : APIRepository<CustomerWithGuidId>
+    {
+        HttpClient http;
+
+        public CustomerWithGuidIdManager(HttpClient _http)
+            : base(_http, "customerwithguidids", "Id")
+        {
+            http = _http;
+        }
+    }
+}
+```
+
+## Step 23 - Add service to Client
+
+To the client project's *Program.cs* file, add the following to the `Main` method:
+
+```c#
+builder.Services.AddScoped<CustomerWithGuidIdManager>();
+```
+
+## Step 24 - Create Blazor Page
+
+To the client project's *Pages* folder add the following Razor Component:
+
+*CustomersWithGuidIds.razor*:
+
+```c#
+@page "/customerswithguidids"
+@inject CustomerWithGuidIdManager CustomerManager
 
 
+<h1>Blob Storage Repository with Guid PK</h1>
 
-> TODO: Fill in the rest of the steps.
+@foreach (var customer in Customers)
+{
+    <p>(@customer.Id) @customer.Name, @customer.Email</p>
+}
+
+@if (Customers.Count > 0)
+{
+    <button @onclick="UpdateIsadora">Update Isadora</button>
+    <button @onclick="DeleteRocky">Delete Rocky</button>
+    <button @onclick="DeleteHugh">Delete Hugh</button>
+    <button @onclick="GetJenny">GetJenny</button>
+    <button @onclick="AddCustomers">Reset Data</button>
+}
+
+<br />
+<br />
+<p>@JennyMessage</p>
+
+@code
+{
+
+    List<CustomerWithGuidId> Customers = new List<CustomerWithGuidId>();
+    string JennyMessage = "";
+
+    async Task DeleteRocky()
+    {
+        var rocky = (from x in Customers
+                     where x.Email == "rocky@rhodes.com"
+                     select x).FirstOrDefault();
+        if (rocky != null)
+        {
+            await CustomerManager.Delete(rocky);
+            await Reload();
+        }
+    }
+
+    async Task DeleteHugh()
+    {
+        var hugh = (from x in Customers
+                    where x.Email == "hugh@jass.com"
+                    select x).FirstOrDefault();
+        if (hugh != null)
+        {
+            await CustomerManager.Delete(hugh.Id);
+            await Reload();
+        }
+    }
+
+
+    async Task UpdateIsadora()
+    {
+        var isadora = (from x in Customers
+                       where x.Email == "isadora@jarr.com"
+                       select x).FirstOrDefault();
+        if (isadora != null)
+        {
+            isadora.Email = "isadora@isadorajarr.com";
+            await CustomerManager.Update(isadora);
+            await Reload();
+        }
+    }
+
+    async Task GetJenny()
+    {
+        JennyMessage = "";
+        var jenny = (from x in Customers
+                     where x.Email == "jenny@jones.com"
+                     select x).FirstOrDefault();
+        if (jenny != null)
+        {
+            var jennyDb = await CustomerManager.GetById(jenny.Id);
+            if (jennyDb != null)
+            {
+                JennyMessage = $"Retrieved Jenny via Id {jennyDb.Id}";
+            }
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        if (Customers.Count == 0)
+            await AddCustomers();
+    }
+
+    async Task Reload()
+    {
+        JennyMessage = "";
+        var list = await CustomerManager.GetAll();
+        if (list != null)
+        {
+            Customers = list.ToList();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task AddCustomers()
+    {
+        await CustomerManager.DeleteAll();
+
+        await CustomerManager.Insert(new CustomerWithGuidId
+        {
+            Id = NewGuid(),
+            Name = "Isadora Jarr",
+            Email = "isadora@jarr.com"
+        });
+
+        await CustomerManager.Insert(new CustomerWithGuidId
+        {
+            Id = NewGuid(),
+            Name = "Rocky Rhodes",
+            Email = "rocky@rhodes.com"
+        });
+
+        await CustomerManager.Insert(new CustomerWithGuidId
+        {
+            Id = NewGuid(),
+            Name = "Jenny Jones",
+            Email = "jenny@jones.com"
+        });
+
+        await CustomerManager.Insert(new CustomerWithGuidId
+        {
+            Id = NewGuid(),
+            Name = "Hugh Jass",
+            Email = "hugh@jass.com"
+        });
+
+        await Reload();
+    }
+
+    Guid NewGuid()
+    {
+        var obj = new object();
+        var rnd = new Random(obj.GetHashCode());
+        var bytes = new byte[16];
+        rnd.NextBytes(bytes);
+        return new Guid(bytes);
+    }
+}
+```
+
+Here we've added a method to return a new randomized Guid called `NewGuid()` which is called when we create the new `Customer` objects. Other than that, it's exactly the same as the `Blobs.razor` page.
+
+Run the app and select the third navigation option:
+
+![image-20210515095756151](images/image-20210515095756151.png)

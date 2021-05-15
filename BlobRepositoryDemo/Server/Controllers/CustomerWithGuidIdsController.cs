@@ -145,7 +145,6 @@ namespace BlobRepositoryDemo.Server.Controllers
                 // log exception here
                 return StatusCode(500);
             }
-
         }
 
         [HttpDelete("{Id}")]
@@ -162,6 +161,5 @@ namespace BlobRepositoryDemo.Server.Controllers
                 return StatusCode(500);
             }
         }
-
     }
 }
